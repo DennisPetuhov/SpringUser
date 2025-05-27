@@ -52,6 +52,10 @@ class WebSocketService @Autowired constructor(
             null
         }
     }
+
+    fun getActiveSessions(): List<String> {
+        return webSocketHandler.getActiveSessions()
+    }
 }
 
 data class WebSocketMessage<T>(

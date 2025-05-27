@@ -29,7 +29,7 @@ class WebSocketHandler : TextWebSocketHandler() {
         logger.info("Received message: {} from session: {}", payload, session.id)
         
         // Echo the message back to the sender as confirmation
-        session.sendMessage(TextMessage("RECEIVED: $payload"))
+//        session.sendMessage(TextMessage("RECEIVED: $payload"))
         
         // Broadcast message to all connected clients except the sender
         broadcastMessage(session.id, payload)

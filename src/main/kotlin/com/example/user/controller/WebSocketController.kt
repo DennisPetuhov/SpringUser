@@ -9,13 +9,12 @@ import org.springframework.web.bind.annotation.*
 @RestController
 @RequestMapping("/api/ws")
 class WebSocketController @Autowired constructor(
-    private val webSocketHandler: WebSocketHandler,
     private val webSocketService: WebSocketService
 ) {
 
     @PostMapping("/broadcast")
     fun broadcast(@RequestBody message: MessageRequest): ResponseEntity<MessageResponse> {
-        webSocketHandler.broadcastMessage("SERVER", message.content)
+        webSocketService.broadcastMessage("BROADCAST", message.content)
         return ResponseEntity.ok(MessageResponse(true, "Message broadcast to all clients"))
     }
     
@@ -30,7 +29,7 @@ class WebSocketController @Autowired constructor(
         @PathVariable sessionId: String,
         @RequestBody message: MessageRequest
     ): ResponseEntity<MessageResponse> {
-        val sent = webSocketHandler.sendMessageToSession(sessionId, message.content)
+        val sent = webSocketService.sendMessage(sessionId, "DIRECT", message.content)
         return if (sent) {
             ResponseEntity.ok(MessageResponse(true, "Message sent to session $sessionId"))
         } else {
@@ -53,7 +52,7 @@ class WebSocketController @Autowired constructor(
     
     @GetMapping("/sessions")
     fun getActiveSessions(): ResponseEntity<SessionsResponse> {
-        val sessions = webSocketHandler.getActiveSessions()
+        val sessions = webSocketService.getActiveSessions()
         return ResponseEntity.ok(SessionsResponse(sessions, sessions.size))
     }
 }

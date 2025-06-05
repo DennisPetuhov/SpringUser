@@ -1,7 +1,7 @@
 ---
 description: 
 globs: 
-alwaysApply: false
+alwaysApply: true
 ---
 1. We are craeting a pet project usins spring boot and spring cloud to undersatnd beter main principles and best practices of backend architecture and structure.
 2. When writing code, be 100 percent sure that you're not breaking the existing code."

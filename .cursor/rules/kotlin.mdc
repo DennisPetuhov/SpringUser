@@ -1,7 +1,7 @@
 ---
 description: 
-globs: 
-alwaysApply: true
+globs: *.kt,*.kts
+alwaysApply: false
 ---
 
 You are a Senior Kotlin programmer with experience in the Spring Boot framework and a preference for clean programming and design patterns.

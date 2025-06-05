@@ -1,7 +1,7 @@
 plugins {
     kotlin("jvm") version "1.9.25"
     kotlin("plugin.spring") version "1.9.25"
-    id("org.springframework.boot") version "3.4.5"
+    id("org.springframework.boot") version "3.2.3"
     id("io.spring.dependency-management") version "1.1.7"
     kotlin("plugin.jpa") version "1.9.25"
 
@@ -19,7 +19,8 @@ java {
 repositories {
     mavenCentral()
 }
-extra["spring-cloud.version"] = "2024.0.1" // Or a newer version compatible with Spring Boot 3.4.4
+extra["spring-cloud.version"] = "2023.0.0"
+extra["spring-boot.version"] = "3.2.3"
 dependencies {
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")

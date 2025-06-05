@@ -1,20 +1,22 @@
 package com.example.user.config
 
 import org.springframework.context.annotation.Configuration
-import org.springframework.web.socket.config.annotation.EnableWebSocket
-import org.springframework.web.socket.config.annotation.WebSocketConfigurer
-import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry
-import org.springframework.beans.factory.annotation.Autowired
-import com.example.user.handler.WebSocketHandler
+import org.springframework.messaging.simp.config.MessageBrokerRegistry
+import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker
+import org.springframework.web.socket.config.annotation.StompEndpointRegistry
+import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer
 
 @Configuration
-@EnableWebSocket
-class WebSocketConfig @Autowired constructor(
-    private val webSocketHandler: WebSocketHandler
-) : WebSocketConfigurer {
+@EnableWebSocketMessageBroker
+class WebSocketConfig : WebSocketMessageBrokerConfigurer {
 
-    override fun registerWebSocketHandlers(registry: WebSocketHandlerRegistry) {
-        registry.addHandler(webSocketHandler, "/ws")
-            .setAllowedOrigins("*") // In production, specify exact origins
+    override fun registerStompEndpoints(registry: StompEndpointRegistry) {
+        registry.addEndpoint("/ws")
+            .setAllowedOriginPatterns("*")
+    }
+
+    override fun configureMessageBroker(config: MessageBrokerRegistry) {
+        config.enableSimpleBroker("/topic", "/queue")
+        config.setApplicationDestinationPrefixes("/app")
     }
 } 

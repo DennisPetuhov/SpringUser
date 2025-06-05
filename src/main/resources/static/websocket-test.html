@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebSocket STOMP Test</title>
+    <script src="https://cdn.jsdelivr.net/npm/@stomp/stompjs@7.0.0/bundles/stomp.umd.min.js"></script>
+    <style>
+        .container {
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+        }
+        .message-box {
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin: 10px 0;
+            height: 300px;
+            overflow-y: auto;
+        }
+        .input-group {
+            margin: 10px 0;
+        }
+        button {
+            padding: 8px 15px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        input[type="text"] {
+            padding: 8px;
+            width: 300px;
+        }
+        .status {
+            color: #666;
+            font-style: italic;
+        }
+        .message {
+            margin: 5px 0;
+            padding: 5px;
+            border-bottom: 1px solid #eee;
+        }
+        .public { color: #2196F3; }
+        .private { color: #4CAF50; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>WebSocket STOMP Test</h2>
+        <div class="status" id="connectionStatus">Disconnected</div>
+        
+        <div class="input-group">
+            <input type="text" id="publicMessage" placeholder="Enter public message">
+            <button onclick="sendPublicMessage()">Send Public Message</button>
+        </div>
+
+        <div class="input-group">
+            <input type="text" id="privateMessage" placeholder="Enter private message">
+            <input type="text" id="recipientId" placeholder="Recipient ID">
+            <button onclick="sendPrivateMessage()">Send Private Message</button>
+        </div>
+
+        <h3>Messages:</h3>
+        <div class="message-box" id="messageBox"></div>
+    </div>
+
+    <script>
+        let stompClient = null;
+        const messageBox = document.getElementById('messageBox');
+        const connectionStatus = document.getElementById('connectionStatus');
+
+        function connect() {
+            stompClient = new StompJs.Client({
+                brokerURL: 'ws://localhost:8080/ws',
+                debug: function (str) {
+                    console.log('STOMP:', str);
+                }
+            });
+
+            stompClient.onConnect = function(frame) {
+                console.log('Connected:', frame);
+                connectionStatus.textContent = 'Connected';
+                connectionStatus.style.color = '#4CAF50';
+                
+                stompClient.subscribe('/topic/messages', function(message) {
+                    console.log('Received:', message);
+                    addMessage('public', message.body);
+                });
+                
+                stompClient.subscribe('/user/queue/private', function(message) {
+                    console.log('Received private:', message);
+                    addMessage('private', message.body);
+                });
+            };
+
+            stompClient.onStompError = function(frame) {
+                console.error('STOMP Error:', frame);
+                connectionStatus.textContent = 'Error: ' + frame.headers['message'];
+                connectionStatus.style.color = 'red';
+            };
+
+            stompClient.onWebSocketError = function(event) {
+                console.error('WebSocket Error:', event);
+                connectionStatus.textContent = 'WebSocket Error';
+                connectionStatus.style.color = 'red';
+            };
+
+            console.log('Connecting to WebSocket...');
+            stompClient.activate();
+        }
+
+        function sendPublicMessage() {
+            const messageInput = document.getElementById('publicMessage');
+            const message = messageInput.value;
+            
+            if (message && stompClient) {
+                stompClient.publish({
+                    destination: '/app/send',
+                    body: JSON.stringify({content: message})
+                });
+                messageInput.value = '';
+            }
+        }
+
+        function sendPrivateMessage() {
+            const messageInput = document.getElementById('privateMessage');
+            const recipientInput = document.getElementById('recipientId');
+            const message = messageInput.value;
+            const recipientId = recipientInput.value;
+            
+            if (message && recipientId && stompClient) {
+                stompClient.publish({
+                    destination: '/app/private',
+                    body: JSON.stringify({
+                        recipientId: recipientId,
+                        content: message
+                    })
+                });
+                messageInput.value = '';
+            }
+        }
+
+        function addMessage(type, message) {
+            const messageElement = document.createElement('div');
+            messageElement.className = `message ${type}`;
+            messageElement.textContent = `${type.toUpperCase()}: ${message}`;
+            messageBox.appendChild(messageElement);
+            messageBox.scrollTop = messageBox.scrollHeight;
+        }
+
+        connect();
+        // Add connection status check
+        function checkConnection() {
+            if (!stompClient || !stompClient.connected) {
+                console.log('Not connected, attempting to reconnect...');
+                connect();
+            }
+        }
+
+        // Check connection every 5 seconds
+        setInterval(checkConnection, 5000);
+
+        // Connect when page loads
+        connect();
+    </script>
+</body>
+</html> 

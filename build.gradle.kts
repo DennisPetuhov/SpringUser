@@ -44,6 +44,7 @@ dependencies {
 //    implementation("org.springframework.boot:spring-boot-starter-actuator")
 //    // eureka client dependency
 //    implementation("org.springframework.cloud:spring-cloud-starter-netflix-eureka-client")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
 }
 // Import Spring Cloud BOM
 dependencyManagement {

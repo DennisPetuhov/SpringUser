@@ -64,6 +64,10 @@
             <button onclick="sendPrivateMessage()">Send Private Message</button>
         </div>
 
+        <div class="input-group">
+            <button onclick="startVideoStream()">Start Video Stream</button>
+        </div>
+
         <h3>Messages:</h3>
         <div class="message-box" id="messageBox"></div>
     </div>
@@ -94,6 +98,13 @@
                 stompClient.subscribe('/user/queue/private', function(message) {
                     console.log('Received private:', message);
                     addMessage('private', message.body);
+                });
+
+                // Subscribe to video streaming endpoint
+                stompClient.subscribe('/app/stream/hello.mp4', function(message) {
+                    console.log('Video streaming started:', message);
+                    console.log('Streaming file: stream/hello.mp4');
+                    addMessage('stream', 'Video streaming initiated: stream/hello.mp4');
                 });
             };
 
@@ -141,6 +152,18 @@
                     })
                 });
                 messageInput.value = '';
+            }
+        }
+
+        function startVideoStream() {
+            if (stompClient) {
+                stompClient.publish({
+                    destination: '/app/stream/hello.mp4',
+                    body: JSON.stringify({
+                        filename: 'stream/hello.mp4'
+                    })
+                });
+                console.log('Requested video stream for: stream/hello.mp4');
             }
         }
 

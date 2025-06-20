@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Streaming Test</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.6.1/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .video-section {
+            padding: 20px;
+            background: #000;
+        }
+        video {
+            width: 100%;
+            max-width: 800px;
+            height: auto;
+            display: block;
+            margin: 0 auto;
+        }
+        .controls {
+            padding: 20px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #dee2e6;
+        }
+        .control-group {
+            margin-bottom: 15px;
+        }
+        .control-group label {
+            display: inline-block;
+            width: 100px;
+            font-weight: bold;
+        }
+        input, select, button {
+            padding: 8px 12px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+        .status {
+            padding: 20px;
+            background: #e9ecef;
+        }
+        .status-item {
+            margin: 5px 0;
+        }
+        .chat-section {
+            padding: 20px;
+            border-top: 1px solid #dee2e6;
+        }
+        .chat-messages {
+            height: 200px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin-bottom: 10px;
+            background: #f8f9fa;
+        }
+        .chat-message {
+            margin-bottom: 8px;
+            padding: 5px;
+            border-radius: 4px;
+            background: white;
+        }
+        .chat-message .username {
+            font-weight: bold;
+            color: #007bff;
+        }
+        .chat-message .timestamp {
+            font-size: 0.8em;
+            color: #6c757d;
+            float: right;
+        }
+        .chat-input {
+            display: flex;
+            gap: 10px;
+        }
+        .chat-input input {
+            flex: 1;
+        }
+        .sync-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #dc3545;
+            margin-left: 10px;
+        }
+        .sync-indicator.connected {
+            background: #28a745;
+        }
+        .viewer-count {
+            background: #17a2b8;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="video-section">
+            <video id="videoPlayer" controls>
+                <source src="/api/video/stream/hello.mp4" type="video/mp4">
+                Your browser does not support the video tag.
+            </video>
+        </div>
+        
+        <div class="controls">
+            <div class="control-group">
+                <label>User ID:</label>
+                <input type="text" id="userId" value="user123" placeholder="Enter your user ID">
+                <label>Username:</label>
+                <input type="text" id="username" value="User123" placeholder="Enter your username">
+            </div>
+            
+            <div class="control-group">
+                <label>Video ID:</label>
+                <input type="text" id="videoId" value="hello.mp4" placeholder="Video ID">
+                <button id="joinBtn">Join Session</button>
+                <button id="leaveBtn" disabled>Leave Session</button>
+                <span class="sync-indicator" id="syncIndicator"></span>
+            </div>
+            
+            <div class="control-group">
+                <button id="syncPlayBtn" disabled>Sync Play</button>
+                <button id="syncPauseBtn" disabled>Sync Pause</button>
+                <button id="syncSeekBtn" disabled>Sync Current Position</button>
+            </div>
+        </div>
+        
+        <div class="status">
+            <div class="status-item">
+                <strong>Connection Status:</strong> 
+                <span id="connectionStatus">Disconnected</span>
+            </div>
+            <div class="status-item">
+                <strong>Viewers:</strong> 
+                <span class="viewer-count" id="viewerCount">0</span>
+            </div>
+            <div class="status-item">
+                <strong>Video State:</strong> 
+                <span id="videoState">Unknown</span>
+            </div>
+            <div class="status-item">
+                <strong>Sync Status:</strong> 
+                <span id="syncStatus">Not synced</span>
+            </div>
+        </div>
+        
+        <div class="chat-section">
+            <h3>Chat</h3>
+            <div class="chat-messages" id="chatMessages"></div>
+            <div class="chat-input">
+                <input type="text" id="chatInput" placeholder="Type a message..." disabled>
+                <button id="sendChatBtn" disabled>Send</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class VideoStreamingClient {
+            constructor() {
+                this.stompClient = null;
+                this.connected = false;
+                this.joined = false;
+                this.userId = null;
+                this.username = null;
+                this.videoId = null;
+                this.video = document.getElementById('videoPlayer');
+                this.ignoreVideoEvents = false;
+                
+                this.initializeElements();
+                this.setupEventListeners();
+                this.connect();
+            }
+            
+            initializeElements() {
+                this.elements = {
+                    userId: document.getElementById('userId'),
+                    username: document.getElementById('username'),
+                    videoId: document.getElementById('videoId'),
+                    joinBtn: document.getElementById('joinBtn'),
+                    leaveBtn: document.getElementById('leaveBtn'),
+                    syncPlayBtn: document.getElementById('syncPlayBtn'),
+                    syncPauseBtn: document.getElementById('syncPauseBtn'),
+                    syncSeekBtn: document.getElementById('syncSeekBtn'),
+                    connectionStatus: document.getElementById('connectionStatus'),
+                    viewerCount: document.getElementById('viewerCount'),
+                    videoState: document.getElementById('videoState'),
+                    syncStatus: document.getElementById('syncStatus'),
+                    syncIndicator: document.getElementById('syncIndicator'),
+                    chatMessages: document.getElementById('chatMessages'),
+                    chatInput: document.getElementById('chatInput'),
+                    sendChatBtn: document.getElementById('sendChatBtn')
+                };
+            }
+            
+            setupEventListeners() {
+                // Button events
+                this.elements.joinBtn.addEventListener('click', () => this.joinSession());
+                this.elements.leaveBtn.addEventListener('click', () => this.leaveSession());
+                this.elements.syncPlayBtn.addEventListener('click', () => this.syncPlay());
+                this.elements.syncPauseBtn.addEventListener('click', () => this.syncPause());
+                this.elements.syncSeekBtn.addEventListener('click', () => this.syncSeek());
+                this.elements.sendChatBtn.addEventListener('click', () => this.sendChat());
+                
+                // Chat input
+                this.elements.chatInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') this.sendChat();
+                });
+                
+                // Video events (for local feedback)
+                this.video.addEventListener('play', () => {
+                    if (!this.ignoreVideoEvents) {
+                        this.updateVideoState('Playing (Local)');
+                    }
+                });
+                
+                this.video.addEventListener('pause', () => {
+                    if (!this.ignoreVideoEvents) {
+                        this.updateVideoState('Paused (Local)');
+                    }
+                });
+                
+                this.video.addEventListener('seeked', () => {
+                    if (!this.ignoreVideoEvents) {
+                        this.updateVideoState('Seeked (Local)');
+                    }
+                });
+            }
+            
+            connect() {
+                const socket = new SockJS('/ws');
+                this.stompClient = Stomp.over(socket);
+                
+                this.stompClient.connect({}, (frame) => {
+                    console.log('Connected: ' + frame);
+                    this.connected = true;
+                    this.updateConnectionStatus('Connected');
+                    this.elements.syncIndicator.classList.add('connected');
+                    
+                    this.subscribeToTopics();
+                }, (error) => {
+                    console.error('Connection error:', error);
+                    this.updateConnectionStatus('Connection Failed');
+                    setTimeout(() => this.connect(), 5000); // Retry connection
+                });
+            }
+            
+            subscribeToTopics() {
+                // Video control messages
+                this.stompClient.subscribe('/topic/video/control', (message) => {
+                    const response = JSON.parse(message.body);
+                    this.handleVideoControl(response);
+                });
+                
+                // Viewer count updates
+                this.stompClient.subscribe('/topic/video/viewers', (message) => {
+                    const response = JSON.parse(message.body);
+                    if (response.videoId === this.videoId) {
+                        this.updateViewerCount(response.count);
+                    }
+                });
+                
+                // Chat messages
+                this.stompClient.subscribe('/topic/video/chat', (message) => {
+                    const response = JSON.parse(message.body);
+                    if (response.videoId === this.videoId) {
+                        this.addChatMessage(response);
+                    }
+                });
+                
+                // Personal video state updates
+                this.stompClient.subscribe('/user/queue/video/state', (message) => {
+                    const state = JSON.parse(message.body);
+                    this.handleVideoState(state);
+                });
+            }
+            
+            joinSession() {
+                if (!this.connected) {
+                    alert('Not connected to server');
+                    return;
+                }
+                
+                this.userId = this.elements.userId.value.trim();
+                this.username = this.elements.username.value.trim();
+                this.videoId = this.elements.videoId.value.trim();
+                
+                if (!this.userId || !this.username || !this.videoId) {
+                    alert('Please fill in all fields');
+                    return;
+                }
+                
+                const joinRequest = {
+                    videoId: this.videoId,
+                    userId: this.userId
+                };
+                
+                this.stompClient.send('/app/video/join', {}, JSON.stringify(joinRequest));
+                
+                this.joined = true;
+                this.elements.joinBtn.disabled = true;
+                this.elements.leaveBtn.disabled = false;
+                this.elements.syncPlayBtn.disabled = false;
+                this.elements.syncPauseBtn.disabled = false;
+                this.elements.syncSeekBtn.disabled = false;
+                this.elements.chatInput.disabled = false;
+                this.elements.sendChatBtn.disabled = false;
+                
+                this.updateSyncStatus('Joined session');
+            }
+            
+            leaveSession() {
+                if (!this.joined) return;
+                
+                const leaveRequest = {
+                    videoId: this.videoId,
+                    userId: this.userId
+                };
+                
+                this.stompClient.send('/app/video/leave', {}, JSON.stringify(leaveRequest));
+                
+                this.joined = false;
+                this.elements.joinBtn.disabled = false;
+                this.elements.leaveBtn.disabled = true;
+                this.elements.syncPlayBtn.disabled = true;
+                this.elements.syncPauseBtn.disabled = true;
+                this.elements.syncSeekBtn.disabled = true;
+                this.elements.chatInput.disabled = true;
+                this.elements.sendChatBtn.disabled = true;
+                
+                this.updateSyncStatus('Left session');
+                this.updateViewerCount(0);
+            }
+            
+            syncPlay() {
+                if (!this.joined) return;
+                
+                const request = {
+                    videoId: this.videoId,
+                    userId: this.userId,
+                    timestamp: this.video.currentTime
+                };
+                
+                this.stompClient.send('/app/video/play', {}, JSON.stringify(request));
+            }
+            
+            syncPause() {
+                if (!this.joined) return;
+                
+                const request = {
+                    videoId: this.videoId,
+                    userId: this.userId,
+                    timestamp: this.video.currentTime
+                };
+                
+                this.stompClient.send('/app/video/pause', {}, JSON.stringify(request));
+            }
+            
+            syncSeek() {
+                if (!this.joined) return;
+                
+                const request = {
+                    videoId: this.videoId,
+                    userId: this.userId,
+                    timestamp: this.video.currentTime
+                };
+                
+                this.stompClient.send('/app/video/seek', {}, JSON.stringify(request));
+            }
+            
+            sendChat() {
+                if (!this.joined) return;
+                
+                const message = this.elements.chatInput.value.trim();
+                if (!message) return;
+                
+                const chatRequest = {
+                    videoId: this.videoId,
+                    userId: this.userId,
+                    username: this.username,
+                    message: message
+                };
+                
+                this.stompClient.send('/app/video/chat', {}, JSON.stringify(chatRequest));
+                this.elements.chatInput.value = '';
+            }
+            
+            handleVideoControl(response) {
+                if (response.videoId !== this.videoId) return;
+                
+                console.log('Video control received:', response);
+                this.ignoreVideoEvents = true;
+                
+                try {
+                    switch (response.action) {
+                        case 'play':
+                            this.video.currentTime = response.timestamp;
+                            this.video.play();
+                            this.updateVideoState(`Playing (Synced by ${response.userId})`);
+                            break;
+                        case 'pause':
+                            this.video.currentTime = response.timestamp;
+                            this.video.pause();
+                            this.updateVideoState(`Paused (Synced by ${response.userId})`);
+                            break;
+                        case 'seek':
+                            this.video.currentTime = response.timestamp;
+                            this.updateVideoState(`Seeked to ${response.timestamp.toFixed(1)}s (by ${response.userId})`);
+                            break;
+                    }
+                    
+                    this.updateSyncStatus(`Synced with ${response.userId}`);
+                } finally {
+                    setTimeout(() => {
+                        this.ignoreVideoEvents = false;
+                    }, 1000);
+                }
+            }
+            
+            handleVideoState(state) {
+                if (!state) return;
+                
+                console.log('Video state received:', state);
+                this.ignoreVideoEvents = true;
+                
+                try {
+                    this.video.currentTime = state.timestamp;
+                    
+                    if (state.state === 'playing') {
+                        this.video.play();
+                    } else if (state.state === 'paused') {
+                        this.video.pause();
+                    }
+                    
+                    this.updateVideoState(`${state.state} (Server State)`);
+                    this.updateSyncStatus('Synced with server state');
+                } finally {
+                    setTimeout(() => {
+                        this.ignoreVideoEvents = false;
+                    }, 1000);
+                }
+            }
+            
+            addChatMessage(message) {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = 'chat-message';
+                
+                const timestamp = new Date(message.timestamp).toLocaleTimeString();
+                messageDiv.innerHTML = `
+                    <span class="timestamp">${timestamp}</span>
+                    <span class="username">${message.username}:</span>
+                    <span class="message">${message.message}</span>
+                `;
+                
+                this.elements.chatMessages.appendChild(messageDiv);
+                this.elements.chatMessages.scrollTop = this.elements.chatMessages.scrollHeight;
+            }
+            
+            updateConnectionStatus(status) {
+                this.elements.connectionStatus.textContent = status;
+            }
+            
+            updateViewerCount(count) {
+                this.elements.viewerCount.textContent = count;
+            }
+            
+            updateVideoState(state) {
+                this.elements.videoState.textContent = state;
+            }
+            
+            updateSyncStatus(status) {
+                this.elements.syncStatus.textContent = status;
+            }
+        }
+        
+        // Initialize the client when the page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            new VideoStreamingClient();
+        });
+    </script>
+</body>
+</html>

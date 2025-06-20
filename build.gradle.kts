@@ -45,6 +45,11 @@ dependencies {
 //    // eureka client dependency
 //    implementation("org.springframework.cloud:spring-cloud-starter-netflix-eureka-client")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactor:1.8.1")
+    
+    // Kafka dependencies
+    implementation("org.springframework.kafka:spring-kafka")
+    testImplementation("org.springframework.kafka:spring-kafka-test")
 }
 // Import Spring Cloud BOM
 dependencyManagement {

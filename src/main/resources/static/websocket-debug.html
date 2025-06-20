@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>WebSocket Debug</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sockjs-client/1.6.1/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+</head>
+<body>
+    <h1>WebSocket Connection Debug</h1>
+    <div id="status">Connecting...</div>
+    <div id="logs"></div>
+    
+    <script>
+        const logs = document.getElementById('logs');
+        const status = document.getElementById('status');
+        
+        function log(message) {
+            console.log(message);
+            logs.innerHTML += '<div>' + new Date().toLocaleTimeString() + ': ' + message + '</div>';
+        }
+        
+        log('Starting WebSocket connection test...');
+        
+        try {
+            const socket = new SockJS('/ws');
+            log('SockJS instance created');
+            
+            const stompClient = Stomp.over(socket);
+            log('STOMP client created');
+            
+            // Enable debug
+            stompClient.debug = function(str) {
+                log('STOMP DEBUG: ' + str);
+            };
+            
+            stompClient.connect({}, function(frame) {
+                log('✅ Connected successfully!');
+                log('Frame: ' + frame);
+                status.innerHTML = '✅ Connected';
+                status.style.color = 'green';
+                
+                // Test subscription
+                stompClient.subscribe('/topic/test', function(message) {
+                    log('Received message: ' + message.body);
+                });
+                
+                // Test sending
+                stompClient.send('/app/test', {}, JSON.stringify({message: 'Hello from debug'}));
+                
+            }, function(error) {
+                log('❌ Connection failed!');
+                log('Error: ' + error);
+                status.innerHTML = '❌ Connection Failed';
+                status.style.color = 'red';
+            });
+            
+        } catch (e) {
+            log('❌ JavaScript Error: ' + e.message);
+            status.innerHTML = '❌ JavaScript Error';
+            status.style.color = 'red';
+        }
+    </script>
+</body>
+</html> 
